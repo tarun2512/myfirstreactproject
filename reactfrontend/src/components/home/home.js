@@ -1,7 +1,7 @@
 // Dashboard.js
 import React from 'react';
 
-function Dashboard() {
+function Home() {
   return (
     <div>
       <h1>Welcome to the Dashboard!</h1>
@@ -10,4 +10,4 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+export default Home;

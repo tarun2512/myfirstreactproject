@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import './login.css'
 import Footer from '../Footer/footer'
+import { Redirect } from 'react-router-dom';
+
 
 function Login() {
     // React States
@@ -54,7 +56,7 @@ function Login() {
       );
   
     // JSX code for login form
-    const renderForm = (
+    const renderLoginForm = (
       <div className="form">
         <form onSubmit={handleSubmit}>
           <div className="input-container">
@@ -78,7 +80,9 @@ function Login() {
       <div className="login">
         <div className="login-form">
           <div className="title">Sign In</div>
-          {isSubmitted ? <div>User is successfully logged in</div> : renderForm}
+          {isSubmitted ? <div>User is successfully logged in
+            <Redirect to="/home" />
+          </div> : renderLoginForm}
         </div>
       </div>
     );
