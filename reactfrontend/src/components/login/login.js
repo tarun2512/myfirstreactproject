@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import './login.css'
 import Footer from '../Footer/footer'
-import { Redirect } from 'react-router-dom';
+import Home from '../home/home'
 
 
 function Login() {
@@ -22,8 +22,7 @@ function Login() {
     ];
   
     const errors = {
-      uname: "invalid username",
-      pass: "invalid password"
+      authenticationError: "invalid username or password",
     };
   
     const handleSubmit = (event) => {
@@ -39,19 +38,17 @@ function Login() {
       if (userData) {
         if (userData.password !== pass.value) {
           // Invalid password
-          setErrorMessages({ name: "pass", message: errors.pass });
+          setErrorMessages({message: errors.authenticationError });
         } else {
           setIsSubmitted(true);
-        }
-      } else {
-        // Username not found
-        setErrorMessages({ name: "uname", message: errors.uname });
+        }}
+      else {
+        setErrorMessages({message: errors.authenticationError });
       }
     };
   
     // Generate JSX code for error message
-    const renderErrorMessage = (name) =>
-      name === errorMessages.name && (
+    const renderErrorMessage = () => (
         <div className="error">{errorMessages.message}</div>
       );
   
@@ -61,13 +58,14 @@ function Login() {
         <form onSubmit={handleSubmit}>
           <div className="input-container">
             <label>Username </label>
+            {renderErrorMessage()}
             <input type="text" name="uname" required />
-            {renderErrorMessage("uname")}
+
           </div>
           <div className="input-container">
             <label>Password </label>
             <input type="password" name="pass" required />
-            {renderErrorMessage("pass")}
+            {/* {renderErrorMessage("pass")} */}
           </div>
           <div className="button-container">
             <input type="submit" />
@@ -80,8 +78,7 @@ function Login() {
       <div className="login">
         <div className="login-form">
           <div className="title">Sign In</div>
-          {isSubmitted ? <div>User is successfully logged in
-            <Redirect to="/home" />
+          {isSubmitted ? <div><Home />
           </div> : renderLoginForm}
         </div>
       </div>
