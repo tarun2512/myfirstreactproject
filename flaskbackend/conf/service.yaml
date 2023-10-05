@@ -1,20 +1,18 @@
-"""
-Purpose: Read the configurations from yaml file
-"""
+service:
+  host: 0.0.0.0
+  port: 8889
+  SECRET_KEY: KLKey
+  enable_security: false
 
-import yaml
+log:
+  file_name: ilens_utility_elm_client
+  path: logs/
+  level: DEBUG
 
+mongo_db:
+  host: localhost
+  port: 27017
+  database_name: ilens_utility_elm_client
 
-# this method is to read the configuration from backup.conf
-def read_configuration(file_name):
-    """
-    :param file_name:
-    :return: all the configuration constants
-    """
-    with open(file_name, 'r') as stream:
-        try:
-            return yaml.load(stream, Loader=yaml.SafeLoader)
-        except yaml.YAMLError as exc:
-            print(exc)
-
-config = read_configuration("conf/service.yml")
+auth:
+  url: "https://www.googleapis.com/oauth2/v3/tokeninfo?id_token="
