@@ -2,50 +2,50 @@ import React, { useState } from 'react'
 import './login.css'
 import Footer from '../Footer/footer'
 import Home from '../home/home'
+import VisitorLoginPage from './visitorlogin'
+import { ServiceUtils } from "../../Shared/Services/Utils";
 
 
 function Login() {
     // React States
     const [errorMessages, setErrorMessages] = useState({});
     const [isSubmitted, setIsSubmitted] = useState(false);
-  
-    // User Login info
-    const database = [
-      {
-        username: "user1",
-        password: "pass1"
-      },
-      {
-        username: "user2",
-        password: "pass2"
-      }
-    ];
+    const [isUser, setIsUser] = useState(false);
   
     const errors = {
       authenticationError: "invalid username or password",
     };
-  
-    const handleSubmit = (event) => {
-      //Prevent page reload
+
+    const handleClick = () => {
+      setIsUser(true);
+    };
+
+    const handleSubmit = async (event) => {
       event.preventDefault();
-  
       var { uname, pass } = document.forms[0];
-  
-      // Find user login info
-      const userData = database.find((user) => user.username === uname.value);
-  
-      // Compare user info
-      if (userData) {
-        if (userData.password !== pass.value) {
-          // Invalid password
-          setErrorMessages({message: errors.authenticationError });
-        } else {
+      try {
+        // const url = 'http://localhost:8999/login';
+        const payload = {          
+                          "user_name": uname.value,
+                          "password": pass.value,}
+        let url = "http://localhost:8999/login"
+        const response = await ServiceUtils.postRequest(url, payload, true);
+    
+        console.log(response); // Log the response data
+    
+        // Check the response from the server for login success or failure
+        if (response.data.status === 'success') {
           setIsSubmitted(true);
-        }}
-      else {
-        setErrorMessages({message: errors.authenticationError });
+          // Login successful
+        } else {
+          // Login failed
+          setErrorMessages({message: errors.authenticationError });
+        }
+      } catch (error) {
+        console.error('Error while logging in', error);
       }
     };
+    
   
     // Generate JSX code for error message
     const renderErrorMessage = () => (
@@ -57,15 +57,18 @@ function Login() {
       <div className="form">
         <form onSubmit={handleSubmit}>
           <div className="input-container">
-            <label>Username </label>
             {renderErrorMessage()}
+            <label>Username </label>
             <input type="text" name="uname" required />
-
           </div>
           <div className="input-container">
             <label>Password </label>
             <input type="password" name="pass" required />
-            {/* {renderErrorMessage("pass")} */}
+          </div>
+          <div>
+            <a onClick={handleClick} style={{ cursor: 'pointer' }}>
+              Not an Admin?
+            </a>
           </div>
           <div className="button-container">
             <input type="submit" />
@@ -78,12 +81,13 @@ function Login() {
       <div className="login">
         <div className="login-form">
           <div className="title">Sign In</div>
-          {isSubmitted ? <div><Home />
-          </div> : renderLoginForm}
+          {isUser ? < VisitorLoginPage /> : (isSubmitted ? <div><Home />
+          </div> : renderLoginForm) }
         </div>
       </div>
     );
   }
+  
 
 function LoginPage() {
     return (
