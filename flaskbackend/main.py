@@ -7,8 +7,7 @@ import flask_compress
 from flask_cors import CORS
 import sys
 from scripts.constants.app_configurations import Service
-from scripts.services.licence_configuration import licence_blueprint
-from scripts.services.scada_configuration import scada_blueprint
+from scripts.services.login_services import login_blueprint
 
 # declaring app
 app = Flask(__name__)
@@ -18,8 +17,7 @@ app.config['SECRET_KEY'] = Service.secret_key
 # compressing the response
 flask_compress.Compress(app)
 
-app.register_blueprint(licence_blueprint)
-app.register_blueprint(scada_blueprint)
+app.register_blueprint(login_blueprint)
 
 try:
     port = sys.argv[1]

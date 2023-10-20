@@ -1,23 +1,35 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 
-from scripts.schemas.login_schema import LoginModel
-from scripts.utils.mongo_utility import MongoConnect
-from scripts.constants.app_constants import MongoMetadata
+from scripts.core.handlers.login_hanlder import LoginHandler
+from scripts.constants.app_constants import Database, APIEndpoints
+from scripts.schemas.response_model import DefaultResponse
 
 login_blueprint = Blueprint("licence_configuration", __name__)
 
-mongo_obj = MongoConnect()
-login_db = MongoMetadata.login_db
+login = Database.login
 
 
-@login_blueprint.route("/licence/licence_get_tabledata", methods=['POST'])
+@login_blueprint.route(APIEndpoints.login, methods=['POST'])
 def get_table_data():
     # Get the JSON data from the request
     data = request.json
+    login_handler = LoginHandler()
+    response = login_handler.validate_login(data)
+    if response.get('status') == 'success':
+        return DefaultResponse(status="success", message=response.get("message"), data=True).dict()
+    else:
+        return DefaultResponse(message=response.get("message"), data=False).dict()
 
-    try:
-        # Deserialize and validate the JSON data using the Pydantic model
-        item_input = LoginModel(**data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+
+@login_blueprint.route(APIEndpoints.visitor_login, methods=['POST'])
+def save_visitor_data():
+    # Get the JSON data from the request
+    data = request.json
+    login_handler = LoginHandler()
+    response = login_handler.save_visitor_data(data)
+    if response.get('status') == 'success':
+        return DefaultResponse(status="success", message=response.get("message"), data=True).dict()
+    else:
+        return DefaultResponse(message=response.get("message"), data=False).dict()
+
 

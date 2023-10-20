@@ -38,10 +38,10 @@ except Exception as e:
 
 
 class Service:
-    MODULE_NAME = config["Service"]["name"]
+    MODULE_NAME = config["SERVICE"]["name"]
     HOST = config.get("SERVICE", "host")
     PORT = config.getint("SERVICE", "port")
-    secret_key = config.getboolean("SERVICE", "secret_key", fallback=True)
+    secret_key = config.get("SERVICE", "secret_key", fallback=True)
 
 
 class Logging:

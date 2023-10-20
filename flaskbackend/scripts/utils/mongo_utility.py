@@ -1,214 +1,283 @@
-""" Mongo DB utility
-All definitions related to mongo db is defined in this module
-"""
+from typing import Dict, List, Optional
 
-import json
-import traceback
 from pymongo import MongoClient
+from pymongo.cursor import Cursor
+
+from scripts.constants.app_configurations import Database
 from scripts.logging import logger
-from scripts.constants.app_configurations import config
 
 
 class MongoConnect:
-    def __init__(self):
+    def __init__(self, uri):
         try:
-            mongo_host = config["mongo_db"]["host"]
-            mongo_port = config["mongo_db"]["port"]
-            self.connection = MongoClient(mongo_host, mongo_port)
-        except Exception as e:
-            logger.exception(f"Exception in the mongo db initialization{str(e)}")
-            traceback.print_exc()
+            self.uri = uri
+            self.client = MongoClient(self.uri, connect=False)
+        except Exception:
+            raise
 
-    def close_mongo_connection(self):
-        """
-        Definition for closing the mongo db connection
-        :return:
-        """
-        try:
-            self.connection.close()
-        except Exception as e:
-            logger.exception(f"Exception in the mongo connection close{str(e)}")
-            traceback.print_exc()
+    def __call__(self, *args, **kwargs):
+        return self.client
 
-    @staticmethod
-    def fetch_records_from_object(body):
-        """
-        Definition for fetching the record from object
-        :param body:
-        :return:
-        """
-        final_list = []
-        try:
-            final_list.extend(iter(body))
-        except Exception as e:
-            logger.exception(e)
-        return final_list
+    def __repr__(self):
+        return f"Mongo Client(uri:{self.uri}, server_info={self.client.server_info()})"
 
-    def search_record_by_query(self, db_name, collection_name, query_json, search_option=None):
+
+class MongoCollectionBaseClass:
+    def __init__(
+        self,
+        mongo_client,
+        database,
+        collection,
+    ):
+        self.client = mongo_client
+        self.database = database
+        self.collection = collection
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(database={self.database}, collection={self.collection})"
+
+    def insert_one(self, data: Dict):
         """
-        Definition for searching the record by query json
-        :param search_option:
-        :param db_name:
-        :param collection_name:
-        :param query_json:
-        :return:
+        The function is used to inserting a document to a collection in a Mongo Database.
+        :param data: Data to be inserted
+        :return: Insert ID
         """
-        mg_response = {}
         try:
-            response = {}
-            docid = self.connection[db_name][collection_name]
-            if query_json == {}:
-                response = (
-                    docid.find(query_json, search_option)
-                    if search_option
-                    else docid.find(query_json)
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.insert_one(data)
+            logger.qtrace(data)
+            return response.inserted_id
+        except Exception:
+            raise
+
+    def insert_many(self, data: List):
+        """
+        The function is used to inserting documents to a collection in a Mongo Database.
+        :param data: List of Data to be inserted
+        :return: Insert IDs
+        """
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.insert_many(data)
+            logger.qtrace(data)
+            return response.inserted_ids
+        except Exception:
+            raise
+
+    def find(
+        self,
+        query: Dict,
+        filter_dict: Optional[Dict] = None,
+        sort=None,
+        skip: Optional[int] = 0,
+        limit: Optional[int] = None,
+    ) -> Cursor:
+        """
+        The function is used to query documents from a given collection in a Mongo Database
+        :param query: Query Dictionary
+        :param filter_dict: Filter Dictionary
+        :param sort: List of tuple with key and direction. [(key, -1), ...]
+        :param skip: Skip Number
+        :param limit: Limit Number
+        :return: List of Documents
+        """
+        if sort is None:
+            sort = []
+        if filter_dict is None:
+            filter_dict = {"_id": 0}
+        database_name = self.database
+        collection_name = self.collection
+        try:
+            db = self.client[database_name]
+            collection = db[collection_name]
+            if len(sort) > 0:
+                cursor = (
+                    collection.find(
+                        query,
+                        filter_dict,
+                    )
+                    .sort(sort)
+                    .skip(skip)
                 )
-            elif search_option:
-                for key, value in query_json.items():
-                    response = docid.find({key: value}, search_option)
             else:
-                for key, value in query_json.items():
-                    response = docid.find({key: value})
-            mg_response = self.fetch_records_from_object(response)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
+                cursor = collection.find(
+                    query,
+                    filter_dict,
+                ).skip(skip)
+            if limit:
+                cursor = cursor.limit(limit)
+            logger.qtrace(f"{query}, {filter_dict}")
+            return cursor
+        except Exception:
+            raise
 
-    def fetch_all(self, db_name, collection_name):
+    def find_one(self, query: Dict, filter_dict: Optional[Dict] = None):
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            if filter_dict is None:
+                filter_dict = {"_id": 0}
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.find_one(query, filter_dict)
+            logger.qtrace(f"{self.collection}, {query}, {filter_dict}")
+            return response
+        except Exception:
+            raise
+
+    def update_one(self, query: Dict, data: Dict, upsert: bool = False):
         """
-        Definition for fetching all the records froma collection
-        :param db_name:
-        :param collection_name:
-        :return:
-        """
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            response = docid.find()
-            mg_response = self.fetch_records_from_object(response)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
 
-    def record_bulk_remove(self, db_name, collection_name, query_json):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            for key, value in query_json.items():
-                mg_response = json.dumps(docid.remove({key: value}, multi=True))
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def delete_one_record(self, db_name, collection_name, query_json):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.delete_one(query_json)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def database_insertion(self, db_name, collection_name, query_json):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.insert(query_json, check_keys=False)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def data_base_update_by_query(self, db_name, collection_name, query, set_json, upsert=False):
-        """
-        Definition for updating one record in mongo according to the query
         :param upsert:
-        :param db_name:
-        :param collection_name:
         :param query:
-        :param set_json:
+        :param data:
         :return:
         """
-        mg_response = {}
         try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.update(query, {"$set": set_json}, upsert=upsert)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.update_one(query, {"$set": data}, upsert=upsert)
+            logger.qtrace(f"{self.collection}, {query}, {data}")
+            return response.modified_count
+        except Exception:
+            raise
 
-    def find_one(self, db_name, collection_name, query, search_json=None):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            if search_json:
-                mg_response = docid.find_one(query, search_json)
-            else:
-                mg_response = docid.find_one(query)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def update_one(self, db_name, collection_name, query, set_json, upsert=False):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            if "$set" not in set_json:
-                mg_response = docid.update_one(query, {"$set": set_json}, upsert=upsert)
-            else:
-                mg_response = docid.update_one(query, set_json, upsert=upsert)
-
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def list_database_names(self):
-        return self.connection.list_database_names()
-
-    def list_collection_names(self, db_name):
-        return self.connection[db_name].list_collection_names()
-
-    def aggregate(self, db_name, collection_name, list_for_aggregation):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.aggregate(list_for_aggregation)
-        except Exception as e:
-            logger.exception(f"Exception in the aggregate definition{str(e)}")
-            traceback.print_exc()
-        return mg_response
-
-    def find_one_and_replace(self, db_name, collection_name, query, existing_data):
-        mg_response = {}
-        try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.find_one_and_replace(query, existing_data)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
-
-    def update_many(self, db_name, collection_name, query, set_json, upsert=False):
+    def update_to_set(self, query: Dict, param: str, data: Dict, upsert: bool = False):
         """
-        Definition for updating one record in mongo according to the query
+
         :param upsert:
-        :param db_name:
-        :param collection_name:
         :param query:
-        :param set_json:
+        :param param:
+        :param data:
         :return:
         """
-        mg_response = {}
         try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.update_many(query, {"$set": set_json}, upsert=upsert)
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.update_one(query, {"$addToSet": {param: data}}, upsert=upsert)
+            logger.qtrace(f"{self.collection}, {query}, {data}")
+            return response.modified_count
+        except Exception:
+            raise
 
-    def delete_many(self, db_name, collection_name):
-        mg_response = {}
+    def update_many(self, query: Dict, data: Dict, upsert: bool = False):
+        """
+
+        :param upsert:
+        :param query:
+        :param data:
+        :return:
+        """
         try:
-            docid = self.connection[db_name][collection_name]
-            mg_response = docid.delete_many({})
-        except Exception as es:
-            logger.exception(es)
-        return mg_response
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.update_many(query, {"$set": data}, upsert=upsert)
+            logger.qtrace(f"{query}, {data}")
+            return response.modified_count
+        except Exception:
+            raise
+
+    def delete_many(self, query: Dict):
+        """
+        :param query:
+        :return:
+        """
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.delete_many(query)
+            logger.qtrace(query)
+            return response.deleted_count
+        except Exception:
+            raise
+
+    def delete_one(self, query: Dict):
+        """
+        :param query:
+        :return:
+        """
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.delete_one(query)
+            logger.qtrace(query)
+            return response.deleted_count
+        except Exception:
+            raise
+
+    def distinct(self, query_key: str, filter_json: Optional[Dict] = None):
+        """
+        :param query_key:
+        :param filter_json:
+        :return:
+        """
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.distinct(query_key, filter_json)
+            logger.qtrace(f"{query_key}, {filter_json}")
+            return response
+        except Exception:
+            raise
+
+    def aggregate(
+        self,
+        pipelines: List,
+    ):
+        try:
+            database_name = self.database
+            collection_name = self.collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.aggregate(pipelines)
+            logger.qtrace(f"{self.collection}, {pipelines}")
+            return response
+        except Exception:
+            raise
+
+
+class MongoAggregateBaseClass:
+    def __init__(
+        self,
+        mongo_client,
+        database,
+    ):
+        self.client = mongo_client
+        self.database = database
+
+    def aggregate(
+        self,
+        collection,
+        pipelines: List,
+    ):
+        try:
+            database_name = self.database
+            collection_name = collection
+            db = self.client[database_name]
+            collection = db[collection_name]
+            response = collection.aggregate(pipelines)
+            logger.qtrace(f"{collection}, {pipelines}")
+            return response
+        except Exception:
+            raise
+
+
+mongo_client = MongoConnect(uri=Database.MONGO_URI)()
