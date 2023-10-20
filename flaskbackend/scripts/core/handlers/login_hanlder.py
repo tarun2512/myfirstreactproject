@@ -44,4 +44,4 @@ class LoginHandler:
         return {"status": "success", "message": "Successfully saved data"}
 
     def view_visitors_list(self):
-
+        ...
